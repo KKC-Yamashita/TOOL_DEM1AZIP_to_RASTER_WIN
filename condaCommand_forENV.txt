@@ -1,0 +1,2 @@
+conda create -n dem1a_env -c conda-forge python=3.11 ^
+numpy pandas geopandas rasterio shapely pyproj fiona rtree -y
