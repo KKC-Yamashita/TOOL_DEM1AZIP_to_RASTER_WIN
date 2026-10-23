@@ -6,6 +6,7 @@ DEM1A XML / ZIP 読取・tupleList 復元・補助関数群
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from io import BytesIO
 from pathlib import Path
@@ -206,18 +207,6 @@ def parse_tuplelist_to_array(
 ) -> np.ndarray:
     """
     tupleList を 2次元配列へ復元する
-
-    前提仕様
-    --------
-    - gml:startPoint = (sx, sy) は tupleList 先頭値が入る格子位置
-    - sequenceRule order = '+x-y'
-      => 左→右、上→下
-    - 配列末尾まで行ったら先頭へ循環
-
-    注意
-    ----
-    lowerCorner / upperCorner は配置用であり、
-    データの並び順自体は startPoint + tupleList で決まる
     """
     order = parse_sequence_rule_order(root)
     if order and order != "+x-y":
@@ -247,9 +236,7 @@ def read_envelope_from_xml_in_zip_fast(
     zip_path: Path,
     xml_name: str,
 ) -> tuple[float, float, float, float] | None:
-    """
-    XML 全体を構築せず、Envelope だけ先読みする
-    """
+    """XML 全体を構築せず、Envelope だけ先読みする"""
     try:
         with zipfile.ZipFile(zip_path, "r") as zf:
             with zf.open(xml_name) as f:
@@ -283,9 +270,7 @@ def collect_intersecting_tiles(
     zip_files: list[Path],
     target_bbox: tuple[float, float, float, float],
 ) -> list[TileCandidate]:
-    """
-    ZIP 群を走査し、Envelope が target_bbox に交差する XML を返す
-    """
+    """ZIP 群を走査し、Envelope が target_bbox に交差する XML を返す"""
     target_west, target_south, target_east, target_north = target_bbox
     hits: list[TileCandidate] = []
 
@@ -326,10 +311,36 @@ def build_tile_grid_spec_from_root(root: ET.Element) -> TileGridSpec:
     nx, ny = parse_grid_size(root)
     west, south, east, north = parse_envelope(root)
 
-    dx = (east - west) / (nx - 1)
-    dy = (north - south) / (ny - 1)
+    dx = (east - west) / nx
+    dy = (north - south) / ny
 
     return TileGridSpec(nx=nx, ny=ny, dx=dx, dy=dy)
+
+
+def snap_bbox_to_grid(
+    west: float,
+    south: float,
+    east: float,
+    north: float,
+    anchor_west: float,
+    anchor_north: float,
+    dx: float,
+    dy: float,
+) -> tuple[float, float, float, float, int, int]:
+    """
+    指定された抽出範囲を、元タイルの格子網（dx, dy）の外側にスナップ（外接）させる。
+    余り（端数）があっても指定範囲を完全に内包し、
+    タイルの格子線とピクセルが完全に一致するように境界を拡張する。
+    """
+    snapped_west = anchor_west + math.floor((west - anchor_west) / dx) * dx
+    snapped_east = anchor_west + math.ceil((east - anchor_west) / dx) * dx
+    snapped_north = anchor_north + math.ceil((north - anchor_north) / dy) * dy
+    snapped_south = anchor_north + math.floor((south - anchor_north) / dy) * dy
+
+    out_width = int(round((snapped_east - snapped_west) / dx))
+    out_height = int(round((snapped_north - snapped_south) / dy))
+
+    return snapped_west, snapped_south, snapped_east, snapped_north, out_width, out_height
 
 
 def build_src_transform(
@@ -342,14 +353,14 @@ def build_src_transform(
 ):
     """
     タイル Envelope から source transform を作る
-    格子点が画素中心に来るよう half-pixel シフト
+    セル外枠をEnvelope境界に一致させる
     """
-    dx = (east - west) / (nx - 1)
-    dy = (north - south) / (ny - 1)
+    dx = (east - west) / nx
+    dy = (north - south) / ny
 
     return from_origin(
-        west - dx / 2.0,
-        north + dy / 2.0,
+        west,
+        north,
         dx,
         dy,
     )
@@ -357,35 +368,17 @@ def build_src_transform(
 
 def build_dst_transform(
     west: float,
-    south: float,
-    east: float,
     north: float,
     dx: float,
     dy: float,
 ):
-    """
-    出力範囲と格子間隔から destination transform を作る
-    """
+    """出力範囲と格子間隔から destination transform を作る"""
     return from_origin(
-        west - dx / 2.0,
-        north + dy / 2.0,
+        west,
+        north,
         dx,
         dy,
     )
-
-
-def calc_output_grid_size(
-    west: float,
-    south: float,
-    east: float,
-    north: float,
-    dx: float,
-    dy: float,
-) -> tuple[int, int]:
-    """出力 raster の width / height を返す"""
-    out_nx = int(round((east - west) / dx)) + 1
-    out_ny = int(round((north - south) / dy)) + 1
-    return out_nx, out_ny
 
 
 def build_gtiff_profile(
@@ -433,10 +426,7 @@ def build_tile_extent_record(
     nx: int,
     ny: int,
 ) -> dict:
-    """
-    タイル矩形 GeoParquet 用の1レコードを作る
-    将来、確認用属性を追加しやすいよう関数化
-    """
+    """タイル矩形 GeoParquet 用の1レコードを作る"""
     return {
         "zip_name": zip_name,
         "xml_name": Path(xml_name).name,

@@ -19,7 +19,7 @@ from dem_utils import (
     build_src_transform,
     build_tile_extent_record,
     build_tile_grid_spec_from_root,
-    calc_output_grid_size,
+    snap_bbox_to_grid,
     collect_intersecting_tiles,
     log_info,
     parse_envelope,
@@ -64,6 +64,7 @@ def main() -> None:
         target_tiles[0].xml_name,
     )
     base_grid = build_tile_grid_spec_from_root(first_root)
+    anchor_west, _, _, anchor_north = parse_envelope(first_root)
 
     log_info(
         f"tile grid: nx={base_grid.nx}, ny={base_grid.ny}, "
@@ -71,16 +72,29 @@ def main() -> None:
     )
 
     # -----------------------------------------------------
-    # 出力グリッド作成
+    # 出力グリッド作成（スナップ処理）
     # -----------------------------------------------------
-    out_width, out_height = calc_output_grid_size(
+    (
+        snapped_west,
+        snapped_south,
+        snapped_east,
+        snapped_north,
+        out_width,
+        out_height,
+    ) = snap_bbox_to_grid(
         west=config.WEST,
         south=config.SOUTH,
         east=config.EAST,
         north=config.NORTH,
+        anchor_west=anchor_west,
+        anchor_north=anchor_north,
         dx=base_grid.dx,
         dy=base_grid.dy,
     )
+
+    log_info(f"Requested bounds : W={config.WEST}, S={config.SOUTH}, E={config.EAST}, N={config.NORTH}")
+    log_info(f"Snapped bounds   : W={snapped_west}, S={snapped_south}, E={snapped_east}, N={snapped_north}")
+    log_info(f"Output raster dim: width={out_width}, height={out_height}")
 
     out_array = np.full(
         (out_height, out_width),
@@ -89,10 +103,8 @@ def main() -> None:
     )
 
     dst_transform = build_dst_transform(
-        west=config.WEST,
-        south=config.SOUTH,
-        east=config.EAST,
-        north=config.NORTH,
+        west=snapped_west,
+        north=snapped_north,
         dx=base_grid.dx,
         dy=base_grid.dy,
     )
@@ -192,6 +204,8 @@ def main() -> None:
 
     with rasterio.open(config.OUTPUT_TIFF_PATH, "w", **profile) as dst:
         dst.write(out_array.astype(np.float32), 1)
+        # ArcGISに格子点データ（Point）であることを明示
+        dst.update_tags(AREA_OR_POINT="Point")
 
     log_info(f"GeoTIFF 保存完了: {config.OUTPUT_TIFF_PATH}")
 
