@@ -13,16 +13,16 @@ from pathlib import Path
 # 入出力設定
 # =========================================================
 # DEM1A の ZIP 格納フォルダ
-TARGET_ZIP_DIR = Path(r"D:\ArcGIS_Project\2610_Nihonmatsu_Fukushima\01_GSI_DATA\01_DEM1A\01_ORG")
+TARGET_ZIP_DIR = Path(r"D:\ArcGIS_Project\2610_RESONAC_五井\01_GSI_DATA\01_DEM1A\01_ORG")
 
 # 出力フォルダ
-OUTPUT_DIR = Path(r"D:\ArcGIS_Project\2610_Nihonmatsu_Fukushima\01_GSI_DATA\01_DEM1A\02_Tiff")
+OUTPUT_DIR = Path(r"D:\ArcGIS_Project\2610_RESONAC_五井\01_GSI_DATA\01_DEM1A\02_Tiff")
 
 # 出力 GeoTIFF 名
-OUTPUT_TIFF_NAME = "Nihonmatsu_DEM1A.tif"
+OUTPUT_TIFF_NAME = "RESONAC_Goi_DEM1A.tif"
 
 # XML ごとの想定タイル矩形 GeoParquet 名
-OUTPUT_TILE_EXTENT_NAME = "Nihonmatsu_DEM1A_tile_extent.parquet"
+OUTPUT_TILE_EXTENT_NAME = "RESONAC_Goi_DEM1A_tile_extent.parquet"
 
 
 # =========================================================
@@ -30,10 +30,10 @@ OUTPUT_TILE_EXTENT_NAME = "Nihonmatsu_DEM1A_tile_extent.parquet"
 # 経緯度（分指定は10進数表記）
 # ※ 分指定を残したいので式のまま記述
 # =========================================================
-WEST = 140 + 16 / 60.0
-EAST = 140 + 41 / 60.0
-SOUTH = 37 + 29 / 60.0
-NORTH = 37 + 40 / 60.0
+WEST = 140 + 3 / 60.0
+EAST = 140 + 5 / 60.0
+SOUTH = 35 + 31 / 60.0
+NORTH = 35 + 33 / 60.0
 
 
 # =========================================================
